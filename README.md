@@ -3,7 +3,9 @@ project inception (docker) for 42
 
 # DOCUMENTATION
 
+
 ---
+
 
 ## DOCKER NGINX
 
@@ -429,7 +431,9 @@ Démarre Nginx en mode **non-daemonisé**, ce qui est indispensable dans un cont
 >
 > `daemon off;` permet de désactiver le mode daemon (arrière-plan) pour que Nginx reste au premier plan en tant que processus principal (PID 1) du conteneur.
 
+
 ---
+
 
 ## DOCKER MARIADB
 
@@ -510,3 +514,45 @@ user = mysql
 * `user = mysql`
   Indique l’utilisateur système Linux sous lequel MariaDB s’exécute.
   Par défaut dans Docker, l’utilisateur `mysql` est déjà configuré.
+
+### DOCKERFILE MARIADB
+
+Pour le Dockerfile de MariaDB, nous pouvons garder les choses simples. Il faut utiliser une image `debian` ou `alpine` comme l'exige le sujet, installer `mariadb-server`, copier le fichier de configuration réalisé précedemment dans le docker, exposer le port 3306 comme exigé dans le sujet.
+
+Toutefois, lorsque MariaDB démarre pour la première fois, il initialise un répertoire de données vide (`/var/lib/mysql`) et configure la base de données système.
+À ce moment-là, si aucun mot de passe ou configuration n’est défini, aucune base ni utilisateur personnalisé n’existe encore, et l’accès root peut être sans mot de passe – ce qui est dangereux en production.
+C’est pourquoi, dans un déploiement automatisé (comme dans un conteneur Docker), il est essentiel de fournir dès le départ des variables suivantes pour :
+
+* Créer une base de données personnalisée
+  `DB_NAME` : permet d’indiquer à MariaDB quelle base créer automatiquement (ex. wordpress)
+  Sans cette variable, il faudrait le faire manuellement après lancement
+
+* Créer un utilisateur avec mot de passe
+  `DB_USER` et `DB_USER_PASS` : permettent de créer un utilisateur dédié
+  pour se connecter à la base sans utiliser le compte `root`
+  **Bonnes pratiques de sécurité :** chaque application (ex. WordPress) doit avoir son propre utilisateur
+
+* Protéger le compte root
+  DB_ROOT_PASS : fixe un mot de passe sécurisé pour l’utilisateur root de MariaDB
+  Sans cela, root pourrait ne pas avoir de mot de passe, ce qui pose un risque critique
+
+Nous allons donc devoir créer un script (`entrypoint.sh` que nous enregistrerons dans le répertoire `tools`) à exécuter au lancement du conteneur MariaDB afin de configurer tout cela (exactement comme si nous tappions des commandes dans le conteneur après son lancement).
+
+Le Dockerfile va donc aussi devoir copier ce script dans de conteneur, donner les droits d'exécutions à ce script, puis exécuter le script.
+
+Pour ce faire, nous utiliserons la directive `ENTRYPOINT` au lieu de `CMD` car `ENTRYPOINT` permet d'exécuter des programmes contrairement à `CMD`.
+
+```Dockerfile
+FROM debian:11.11
+RUN apt-get update -y \
+&& apt-get install -y mariadb-server \
+&& apt-get clean \
+&& rm -rf /var/lib/apt/lists/*
+COPY conf/50-server.cnf /etc/mysql/mariadb.conf.d/50-server.cnf
+COPY tools/entrypoint.sh /usr/local/bin/entrypoint.sh
+EXPOSE 3306
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+```
+
+
+
