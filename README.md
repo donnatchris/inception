@@ -597,6 +597,8 @@ Cependant, cette méthode rend les valeurs **statiques et figées dans l’image
 
 #### Avec `docker-compose.yml` (recommandé dans Inception)
 
+> Un fichier docker-compose.yml est un fichier de configuration au format YAML qui permet de définir, configurer et lancer plusieurs conteneurs Docker en une seule commande (docker-compose up).
+
 Une manière simple et lisible consiste à déclarer les variables directement dans la section `environment` du fichier `docker-compose.yml` (*-> voir plus loin pour la réalisation d'un fichier `docker-compose.yml`*) :
 
 ```yaml
