@@ -4,13 +4,10 @@ project inception (docker) for 42
 # DOCUMENTATION
 
 
----
-
-
 ## DOCKER NGINX
 
 Nginx est un serveur web performant et léger, conçu pour gérer efficacement un grand nombre de connexions simultanées.
-Dans le projet Inception, il sert à recevoir les requêtes HTTP/HTTPS des clients et à les transmettre, selon le cas :
+Dans le projet Inception, il sert à recevoir les requêtes HTTPS des clients et à les transmettre, selon le cas :
 - soit directement (pour des fichiers statiques comme HTML ou CSS),
 - soit à un service en arrière-plan comme PHP-FPM (pour exécuter WordPress).
 C’est le point d’entrée du site web, le composant qui fait l’interface entre le monde extérieur et les services internes du projet.
