@@ -13,7 +13,7 @@ Dans le projet Inception, il sert à recevoir les requêtes HTTPS des clients et
 C’est le point d’entrée du site web, le composant qui fait l’interface entre le monde extérieur et les services internes du projet.
 
 
-Pour realiser le docker Nginx , il faut d abord creer un fichier de configuration pour Nginx, puis un  Dockerfile qui creera le docker a partir d une image Debian ou Alpine.
+Pour realiser le docker Nginx , il faut d'abord créer un fichier de configuration pour Nginx, puis un  Dockerfile qui creera le docker a partir d'une image Debian ou Alpine.
 
 ### FICHIER DE CONFIGURATION NGINX `nginx.conf`
 
