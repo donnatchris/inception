@@ -533,14 +533,12 @@ C’est pourquoi, dans un déploiement automatisé (comme dans un conteneur Dock
   **Bonnes pratiques de sécurité :** chaque application (ex. WordPress) doit avoir son propre utilisateur
 
 * Protéger le compte root
-  DB_ROOT_PASS : fixe un mot de passe sécurisé pour l’utilisateur root de MariaDB
+  `DB_ROOT_PASS` : fixe un mot de passe sécurisé pour l’utilisateur root de MariaDB
   Sans cela, root pourrait ne pas avoir de mot de passe, ce qui pose un risque critique
 
 Nous allons donc devoir créer un script (`entrypoint.sh` que nous enregistrerons dans le répertoire `tools`) à exécuter au lancement du conteneur MariaDB afin de configurer tout cela (exactement comme si nous tappions des commandes dans le conteneur après son lancement).
 
 Le Dockerfile va donc aussi devoir copier ce script dans de conteneur, donner les droits d'exécutions à ce script, puis exécuter le script.
-
-Pour ce faire, nous utiliserons la directive `ENTRYPOINT` au lieu de `CMD` car `ENTRYPOINT` permet d'exécuter des programmes contrairement à `CMD`.
 
 ```Dockerfile
 FROM debian:11.11
@@ -554,5 +552,7 @@ EXPOSE 3306
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 ```
 
+>  Pourquoi ENTRYPOINT et pas CMD ?
+> Parce que ENTRYPOINT permet de remplacer le processus principal du conteneur (PID 1) par un script ou programme, ce qui est idéal pour exécuter notre script d’initialisation.
 
 
