@@ -855,7 +855,7 @@ mariadb -u root -p"$MDB_ROOT_PASS"
 SHOW DATABASES
 ```
 
-Cette commande affiche le tableau avec les databases présentes. Elle doit afficher :
+Cette commande affiche le tableau avec les databases présentes. Elle doit afficher le nom de la base de données créée ainsi que les bases de données présentes par défaut :
 
 ```text
 +--------------------+
