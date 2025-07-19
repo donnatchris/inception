@@ -644,4 +644,201 @@ services:
 > Dans le cadre du projet **Inception**, il est **recommandé d’utiliser le fichier `docker-compose.yml` avec des variables définies directement dans un fichier `.env`**.
 
 
+### SCRIPT POUR CONFIGURER MARIADB
+
+Voici le script utilisé (placé dans le répertoire `tools` du répertoire `mariadb`):
+
+Ce script est exécuté automatiquement au démarrage du conteneur MariaDB. Il initialise la base de données, crée l’utilisateur, la base de donnée `wordpress`, et applique les bonnes permissions à partir des **variables d’environnement** fournies.
+
+#### Contenu du script
+
+Voici le fichier complet :
+
+```bash
+#!/bin/bash
+
+set -e
+
+# Vérification des variables d’environnement obligatoires
+: "${MDB_NAME:?Variable d'environnement MDB_NAME manquante}"
+: "${MDB_USER:?Variable d'environnement MDB_USER manquante}"
+: "${MDB_USER_PASS:?Variable d'environnement MDB_USER_PASS manquante}"
+: "${MDB_ROOT_PASS:?Variable d'environnement MDB_ROOT_PASS manquante}"
+
+# Préparation du répertoire socket
+mkdir -p /run/mysqld
+chown -R mysql:mysql /run/mysqld
+
+# Initialisation de la base si nécessaire
+if [ ! -d /var/lib/mysql/mysql ]; then
+    echo "📦 Initialisation de la base de données..."
+    mariadb-install-db --user=mysql --datadir=/var/lib/mysql > /dev/null
+fi
+
+# Démarrage temporaire de MariaDB (sans réseau)
+mysqld_safe --skip-networking &
+pid="$!"
+
+# Attente que le serveur MariaDB soit prêt
+for i in {30..0}; do
+  if mysqladmin ping &>/dev/null; then
+    break
+  fi
+  echo -n "."
+  sleep 1
+done
+if [ "$i" = 0 ]; then
+  echo "❌ Échec du démarrage de MariaDB."
+  exit 1
+fi
+
+# Configuration SQL initiale via mariadb -e
+echo "🛠 Configuration initiale..."
+mariadb -u root -p"${MDB_ROOT_PASS}" -e "CREATE DATABASE IF NOT EXISTS \${MDB_NAME}\;"
+mariadb -u root -p"${MDB_ROOT_PASS}" -e "CREATE USER IF NOT EXISTS \${MDB_USER}\@'%' IDENTIFIED BY '${MDB_USER_PASS}';"
+mariadb -u root -p"${MDB_ROOT_PASS}" -e "GRANT ALL PRIVILEGES ON \${MDB_NAME}\.* TO \${MDB_USER}\@'%';"
+mariadb -u root -p"${MDB_ROOT_PASS}" -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${MDB_ROOT_PASS}';"
+mariadb -u root -p"${MDB_ROOT_PASS}" -e "FLUSH PRIVILEGES;"
+
+# Arrêt du serveur MariaDB temporaire
+mysqladmin -u root -p"${MDB_ROOT_PASS}" shutdown
+
+# Lancement final de MariaDB en mode production
+echo "✅ Démarrage définitif de MariaDB..."
+exec mysqld_safe
+```
+
+#### Explication du script
+
+* `#!/bin/bash` : indique que le script doit être interprété par Bash.
+* `set -e` : le script s'arrête immédiatement si une commande échoue. Cela évite d’exécuter la suite du script avec une base mal configurée.
+
+```bash
+# Vérification des variables d’environnement obligatoires
+: "${MDB_NAME:?Variable d'environnement MDB_NAME manquante}"
+: "${MDB_USER:?Variable d'environnement MDB_USER manquante}"
+: "${MDB_USER_PASS:?Variable d'environnement MDB_USER_PASS manquante}"
+: "${MDB_ROOT_PASS:?Variable d'environnement MDB_ROOT_PASS manquante}"
+```
+
+* Vérifie que les **quatre variables d’environnement** sont bien définies.
+* Si l'une d'elles est absente, le conteneur **échoue immédiatement** au démarrage avec un message clair.
+
+---
+
+```bash
+# Préparation du répertoire socket
+mkdir -p /run/mysqld
+chown -R mysql:mysql /run/mysqld
+```
+
+* Crée le dossier `/run/mysqld` si nécessaire (utilisé pour le fichier socket Unix).
+* Change le propriétaire pour l’utilisateur `mysql`, comme requis par MariaDB.
+
+---
+
+```bash
+# Initialisation de la base si nécessaire
+if [ ! -d /var/lib/mysql/mysql ]; then
+    echo "📦 Initialisation de la base de données..."
+    mariadb-install-db --user=mysql --datadir=/var/lib/mysql > /dev/null
+fi
+```
+
+* Teste si la base système (`mysql`) existe.
+* Si ce n’est **pas le cas** (premier démarrage), elle est initialisée avec `mariadb-install-db`.
+
+---
+
+```bash
+# Démarrage temporaire de MariaDB (sans réseau)
+mysqld_safe --skip-networking &
+pid="$!"
+```
+
+* Démarre MariaDB **en arrière-plan**, sans ouvrir le port réseau.
+* Le mode `--skip-networking` garantit qu’aucune connexion externe n'est possible durant l'init.
+* Stocke le **PID** pour un arrêt propre ensuite.
+
+---
+
+```bash
+# Attente que le serveur MariaDB soit prêt
+for i in {30..0}; do
+  if mysqladmin ping &>/dev/null; then
+    break
+  fi
+  echo -n "."
+  sleep 1
+done
+if [ "$i" = 0 ]; then
+  echo "❌ Échec du démarrage de MariaDB."
+  exit 1
+fi
+```
+
+* Attend que MariaDB soit **opérationnel** (ping OK).
+* Timeout de 30 secondes.
+* Affiche une erreur et quitte si le serveur ne répond pas.
+
+---
+
+```bash
+# Configuration SQL initiale via mariadb -e
+echo "🛠 Configuration initiale..."
+mariadb -u root -p"${MDB_ROOT_PASS}" -e "CREATE DATABASE IF NOT EXISTS \`${MDB_NAME}\`;"
+mariadb -u root -p"${MDB_ROOT_PASS}" -e "CREATE USER IF NOT EXISTS \`${MDB_USER}\`@'%' IDENTIFIED BY '${MDB_USER_PASS}';"
+mariadb -u root -p"${MDB_ROOT_PASS}" -e "GRANT ALL PRIVILEGES ON \`${MDB_NAME}\`.* TO \`${MDB_USER}\`@'%';"
+mariadb -u root -p"${MDB_ROOT_PASS}" -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${MDB_ROOT_PASS}';"
+mariadb -u root -p"${MDB_ROOT_PASS}" -e "FLUSH PRIVILEGES;"
+```
+
+* Crée la base de données si elle n’existe pas.
+* Crée un utilisateur avec mot de passe et accès total à cette base.
+* Définit le mot de passe root (si absent au départ).
+* Applique les privilèges avec `FLUSH PRIVILEGES`.
+
+Chaque commande est exécutée via `mariadb -e` (exécution en ligne de commande).
+
+---
+
+```bash
+# Arrêt du serveur MariaDB temporaire
+mysqladmin -u root -p"${MDB_ROOT_PASS}" shutdown
+```
+
+* Stoppe proprement l’instance temporaire après configuration.
+
+---
+
+```bash
+# Lancement final de MariaDB en mode production
+echo "✅ Démarrage définitif de MariaDB..."
+exec mysqld_safe
+```
+
+* Lance `mysqld_safe` **en mode foreground** avec `exec`, ce qui le remplace comme **PID 1**.
+* Permet au conteneur de rester actif tant que MariaDB tourne.
+
+---
+
+### 📌 Résumé
+
+Ce script respecte les bonnes pratiques Docker :
+
+* Il est **idempotent** (il n’écrase pas une base déjà initialisée).
+* Il lit les variables d’environnement.
+* Il garantit un démarrage sûr et propre.
+* Il prépare automatiquement l’accès pour WordPress.
+
+Tu peux l’intégrer directement à ton README sous une section comme :
+
+```markdown
+## Fichier `entrypoint.sh` – Initialisation automatique de MariaDB
+```
+
+Souhaites-tu que je génère aussi une version commentée du script directement dans un bloc `bash` ?
+
+
+
 
