@@ -555,4 +555,91 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 >  Pourquoi ENTRYPOINT et pas CMD ?
 > Parce que ENTRYPOINT permet de remplacer le processus principal du conteneur (PID 1) par un script ou programme, ce qui est idéal pour exécuter notre script d’initialisation.
 
+### DOCKER ET LES VARIABLES D'ENVIRONNEMENT
+
+#### Passer des variables d’environnement à un conteneur Docker
+
+Les **variables d’environnement** permettent de transmettre des informations dynamiques à un conteneur, comme des identifiants, un mot de passe, ou un nom de base de données.
+Il existe plusieurs manières de les définir, selon l’outil utilisé.
+
+#### En ligne de commande avec `docker run -e`
+
+Lorsqu’on utilise `docker run` directement (sans `docker-compose`), il est possible de passer les variables une par une avec l'option `-e` :
+
+```bash
+docker run -e DB_NAME=wordpress \
+           -e DB_USER=wp_user \
+           -e DB_USER_PASS=wp_pass \
+           -e DB_ROOT_PASS=rootpass \
+           nom_de_l_image
+```
+
+#### Avec un fichier `.env` et `docker run --env-file`
+
+Les variables peuvent également être stockées dans un fichier `.env` et injectées au conteneur via l’option `--env-file` :
+
+```bash
+docker run --env-file .env nom_de_l_image
+```
+
+#### Avec l’instruction `ENV` dans le `Dockerfile`
+
+Il est aussi possible de définir des variables directement dans le `Dockerfile` :
+
+```dockerfile
+ENV DB_NAME=wordpress
+ENV DB_USER=wp_user
+ENV DB_USER_PASS=wp_pass
+ENV DB_ROOT_PASS=rootpass
+```
+
+Cependant, cette méthode rend les valeurs **statiques et figées dans l’image**. Il faut reconstruire l’image si l’on souhaite modifier une valeur.
+
+#### Avec `docker-compose.yml` (recommandé dans Inception)
+
+Une manière simple et lisible consiste à déclarer les variables directement dans la section `environment` du fichier `docker-compose.yml` (*-> voir plus loin pour la réalisation d'un fichier `docker-compose.yml`*) :
+
+```yaml
+services:
+  mariadb:
+    build: ./srcs/requirements/mariadb
+    environment:
+      DB_NAME: wordpress
+      DB_USER: wp_user
+      DB_USER_PASS: wp_pass
+      DB_ROOT_PASS: rootpass
+```
+
+Ces variables seront injectées dans le conteneur **au moment de son exécution** et pourront être utilisées dans des scripts comme `entrypoint.sh`.
+
+#### Avec un fichier `.env` et `docker-compose.tml`
+
+Il est également possible de stocker les variables dans un fichier `.env` situé à la racine du projet :
+
+```env
+DB_NAME=wordpress
+DB_USER=wp_user
+DB_USER_PASS=wp_pass
+DB_ROOT_PASS=rootpass
+```
+
+Par défaut, `docker-compose` lit automatiquement ce fichier `.env` **s’il se trouve dans le même dossier que le `docker-compose.yml`**.
+Il est alors possible de référencer ces variables dans `docker-compose.yml` :
+
+```yaml
+services:
+  mariadb:
+    build: ./srcs/requirements/mariadb
+    environment:
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_USER_PASS: ${DB_USER_PASS}
+      DB_ROOT_PASS: ${DB_ROOT_PASS}
+```
+
+#### Recommandation (projet Inception)
+
+> Dans le cadre du projet **Inception**, il est **recommandé d’utiliser le fichier `docker-compose.yml` avec des variables définies directement dans un fichier `.env`**.
+
+
 
