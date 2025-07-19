@@ -659,27 +659,21 @@ Voici le fichier complet :
 
 set -e
 
-# Vérification des variables d’environnement obligatoires
 : "${MDB_NAME:?Variable d'environnement MDB_NAME manquante}"
 : "${MDB_USER:?Variable d'environnement MDB_USER manquante}"
 : "${MDB_USER_PASS:?Variable d'environnement MDB_USER_PASS manquante}"
 : "${MDB_ROOT_PASS:?Variable d'environnement MDB_ROOT_PASS manquante}"
 
-# Préparation du répertoire socket
 mkdir -p /run/mysqld
 chown -R mysql:mysql /run/mysqld
 
-# Initialisation de la base si nécessaire
 if [ ! -d /var/lib/mysql/mysql ]; then
-    echo "📦 Initialisation de la base de données..."
+    echo "📦 Initializing database..."
     mariadb-install-db --user=mysql --datadir=/var/lib/mysql > /dev/null
 fi
 
-# Démarrage temporaire de MariaDB (sans réseau)
 mysqld_safe --skip-networking &
-pid="$!"
 
-# Attente que le serveur MariaDB soit prêt
 for i in {30..0}; do
   if mysqladmin ping &>/dev/null; then
     break
@@ -688,23 +682,20 @@ for i in {30..0}; do
   sleep 1
 done
 if [ "$i" = 0 ]; then
-  echo "❌ Échec du démarrage de MariaDB."
+  echo "❌ Failed to start MariaDB."
   exit 1
 fi
 
-# Configuration SQL initiale via mariadb -e
-echo "🛠 Configuration initiale..."
+echo "🛠 Initial configuration..."
 mariadb -u root -p"${MDB_ROOT_PASS}" -e "CREATE DATABASE IF NOT EXISTS \${MDB_NAME}\;"
 mariadb -u root -p"${MDB_ROOT_PASS}" -e "CREATE USER IF NOT EXISTS \${MDB_USER}\@'%' IDENTIFIED BY '${MDB_USER_PASS}';"
 mariadb -u root -p"${MDB_ROOT_PASS}" -e "GRANT ALL PRIVILEGES ON \${MDB_NAME}\.* TO \${MDB_USER}\@'%';"
 mariadb -u root -p"${MDB_ROOT_PASS}" -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${MDB_ROOT_PASS}';"
 mariadb -u root -p"${MDB_ROOT_PASS}" -e "FLUSH PRIVILEGES;"
 
-# Arrêt du serveur MariaDB temporaire
 mysqladmin -u root -p"${MDB_ROOT_PASS}" shutdown
 
-# Lancement final de MariaDB en mode production
-echo "✅ Démarrage définitif de MariaDB..."
+echo "✅ MariaDB starts..."
 exec mysqld_safe
 ```
 
@@ -720,7 +711,7 @@ exec mysqld_safe
 : "${MDB_ROOT_PASS:?Variable d'environnement MDB_ROOT_PASS manquante}"
 ```
 
-* Vérifie que les **quatre variables d’environnement** sont bien définies.
+* Vérifie que les **quatre variables d’environnement** sont bien définies (pas obligatoire mais bonne pratique).
 * Si l'une d'elles est absente, le conteneur **échoue immédiatement** au démarrage avec un message clair.
 
 ```bash
@@ -742,13 +733,11 @@ fi
 
 ```bash
 mysqld_safe --skip-networking &
-pid="$!"
 ```
 
 * Démarre MariaDB **en arrière-plan**, sans ouvrir le port réseau.
 * Le symbole `&` en bash (et en shell en général) lance la commande en arrière-plan.
 * Le mode `--skip-networking` garantit qu’aucune connexion externe n'est possible durant l'init (ela empêche un client malveillant ou mal configuré d’envoyer une requête avant que la base ne soit prête).
-* Stocke le **PID** dans une variable qu'on nomme `pid` pour un arrêt propre ensuite. On utilise ici `$!` qui est une variable du shell qui contient le PID du dernier processus exécuté en arrière-plan.
 
 ```bash
 for i in {30..0}; do
