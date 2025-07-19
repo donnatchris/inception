@@ -714,7 +714,6 @@ exec mysqld_safe
 * `set -e` : le script s'arrête immédiatement si une commande échoue. Cela évite d’exécuter la suite du script avec une base mal configurée.
 
 ```bash
-# Vérification des variables d’environnement obligatoires
 : "${MDB_NAME:?Variable d'environnement MDB_NAME manquante}"
 : "${MDB_USER:?Variable d'environnement MDB_USER manquante}"
 : "${MDB_USER_PASS:?Variable d'environnement MDB_USER_PASS manquante}"
@@ -724,23 +723,16 @@ exec mysqld_safe
 * Vérifie que les **quatre variables d’environnement** sont bien définies.
 * Si l'une d'elles est absente, le conteneur **échoue immédiatement** au démarrage avec un message clair.
 
----
-
 ```bash
-# Préparation du répertoire socket
 mkdir -p /run/mysqld
 chown -R mysql:mysql /run/mysqld
 ```
 
-* Crée le dossier `/run/mysqld` si nécessaire (utilisé pour le fichier socket Unix).
+* Crée le dossier `/run/mysqld` si nécessaire (utilisé pour le fichier socket Unix, un fichier spécial qui permet à un client de se connecter).
 * Change le propriétaire pour l’utilisateur `mysql`, comme requis par MariaDB.
 
----
-
 ```bash
-# Initialisation de la base si nécessaire
 if [ ! -d /var/lib/mysql/mysql ]; then
-    echo "📦 Initialisation de la base de données..."
     mariadb-install-db --user=mysql --datadir=/var/lib/mysql > /dev/null
 fi
 ```
@@ -748,22 +740,17 @@ fi
 * Teste si la base système (`mysql`) existe.
 * Si ce n’est **pas le cas** (premier démarrage), elle est initialisée avec `mariadb-install-db`.
 
----
-
 ```bash
-# Démarrage temporaire de MariaDB (sans réseau)
 mysqld_safe --skip-networking &
 pid="$!"
 ```
 
 * Démarre MariaDB **en arrière-plan**, sans ouvrir le port réseau.
-* Le mode `--skip-networking` garantit qu’aucune connexion externe n'est possible durant l'init.
-* Stocke le **PID** pour un arrêt propre ensuite.
-
----
+* Le symbole `&` en bash (et en shell en général) lance la commande en arrière-plan.
+* Le mode `--skip-networking` garantit qu’aucune connexion externe n'est possible durant l'init (ela empêche un client malveillant ou mal configuré d’envoyer une requête avant que la base ne soit prête).
+* Stocke le **PID** dans une variable qu'on nomme `pid` pour un arrêt propre ensuite. On utilise ici `$!` qui est une variable du shell qui contient le PID du dernier processus exécuté en arrière-plan.
 
 ```bash
-# Attente que le serveur MariaDB soit prêt
 for i in {30..0}; do
   if mysqladmin ping &>/dev/null; then
     break
@@ -772,20 +759,18 @@ for i in {30..0}; do
   sleep 1
 done
 if [ "$i" = 0 ]; then
-  echo "❌ Échec du démarrage de MariaDB."
+  echo "❌ Failed to start MariaDB."
   exit 1
 fi
 ```
 
 * Attend que MariaDB soit **opérationnel** (ping OK).
+* `mysqladmin` est est un outil en ligne de commande fourni avec MariaDB/MySQL qui sert à administrer un serveur de base de données (le démarrer, l'arrêter, vérifier son état, etc.).
+* `mysqladmin ping` n'a rien à voir avec le ping réseau: Le ping ici tente de se connecter au serveur MariaDB via le socket, envoie une requête légère, attends une réponse (qu'on envoie dans `&>/dev/null` pour ne pas l'afficher), renvoie un code de sortie (0 si OK, 1 si échec).
 * Timeout de 30 secondes.
 * Affiche une erreur et quitte si le serveur ne répond pas.
 
----
-
 ```bash
-# Configuration SQL initiale via mariadb -e
-echo "🛠 Configuration initiale..."
 mariadb -u root -p"${MDB_ROOT_PASS}" -e "CREATE DATABASE IF NOT EXISTS \`${MDB_NAME}\`;"
 mariadb -u root -p"${MDB_ROOT_PASS}" -e "CREATE USER IF NOT EXISTS \`${MDB_USER}\`@'%' IDENTIFIED BY '${MDB_USER_PASS}';"
 mariadb -u root -p"${MDB_ROOT_PASS}" -e "GRANT ALL PRIVILEGES ON \`${MDB_NAME}\`.* TO \`${MDB_USER}\`@'%';"
@@ -798,47 +783,24 @@ mariadb -u root -p"${MDB_ROOT_PASS}" -e "FLUSH PRIVILEGES;"
 * Définit le mot de passe root (si absent au départ).
 * Applique les privilèges avec `FLUSH PRIVILEGES`.
 
-Chaque commande est exécutée via `mariadb -e` (exécution en ligne de commande).
+* `mariadb` est le **client en ligne de commande** de MariaDB
+* `-u` spécifie l'utilisateur
+* `-p` spécifie le mot de passe (attention: pas d'espace entre -p et le mot de passe)
+* `-e` signifie : exécute cette commande SQL et quitte le shell MariaDB interactif (mode non interactif).
+* par convention, les commandes MariaDB sont en majuscule (mais ça fonctionne sans)
 
----
 
 ```bash
-# Arrêt du serveur MariaDB temporaire
 mysqladmin -u root -p"${MDB_ROOT_PASS}" shutdown
 ```
 
-* Stoppe proprement l’instance temporaire après configuration.
-
----
+* Cette commande arrête proprement le serveur MariaDB lancé temporairement en arrière-plan pendant la phase de configuration initiale.
 
 ```bash
-# Lancement final de MariaDB en mode production
-echo "✅ Démarrage définitif de MariaDB..."
+echo "✅ MariaDB starts..."
 exec mysqld_safe
 ```
 
-* Lance `mysqld_safe` **en mode foreground** avec `exec`, ce qui le remplace comme **PID 1**.
+* Lance `mysqld_safe` **en mode foreground** avec `exec` : exec remplace le processus courant (ici : le script shell) par le processus mysqld_safe, sans créer un nouveau processus enfant (ce qui le remplace comme **PID 1**).
+* Il prend la place du script.
 * Permet au conteneur de rester actif tant que MariaDB tourne.
-
----
-
-### 📌 Résumé
-
-Ce script respecte les bonnes pratiques Docker :
-
-* Il est **idempotent** (il n’écrase pas une base déjà initialisée).
-* Il lit les variables d’environnement.
-* Il garantit un démarrage sûr et propre.
-* Il prépare automatiquement l’accès pour WordPress.
-
-Tu peux l’intégrer directement à ton README sous une section comme :
-
-```markdown
-## Fichier `entrypoint.sh` – Initialisation automatique de MariaDB
-```
-
-Souhaites-tu que je génère aussi une version commentée du script directement dans un bloc `bash` ?
-
-
-
-
