@@ -229,7 +229,7 @@ Voici les commandes les plus courantes :
   ```
 
   * `-t` sert à donner un nom à l’image (exemple : `nginx42`)
-  * `.` indique le contexte de build (le dossier contenant le `Dockerfile`)
+  * `.` indique le contexte de build : le dossier contenant le `Dockerfile` (il faut donc être dans le répertoire du Dockerfile pour exécuter cette commande)
 
 * `docker images`
   Affiche la liste des images Docker disponibles localement.
