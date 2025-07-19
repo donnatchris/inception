@@ -797,7 +797,7 @@ exec mysqld_safe
 A ce stade, il est possible de tester le conteneur MariaDB.
 Pour cela, il faut se placer dans le répertoire contenant le `Dockerfile` et tapper les commandes suivantes :
 
-* construire l'image :
+#### construire l'image :
 
 ```bash
 docker build -t mariadb .
@@ -805,7 +805,7 @@ docker build -t mariadb .
 
 - `-t` sert à donner un nom à l'image
 
-* lancer le docker :
+#### lancer le docker :
 
 ```bash
 docker run -d \
@@ -822,7 +822,7 @@ docker run -d \
 - `-e VARIABLE=valeur` permet de transmettre une variable d'environnement au lancement du docker
 - `mariadb` est le nom de l'image utilisée (celle créée précédemment)
 
-* consulter les logs :
+#### consulter les logs :
 
 ```bash
 docker logs -f mariadb_test
@@ -830,7 +830,7 @@ docker logs -f mariadb_test
 
 - `-f` permet d'afficher les nouvelles lignes en direct s'il y en a
 
-* entrer dans le conteneur :
+#### entrer dans le conteneur :
 
 ```bash
 docker exec -it mariadb_test bash
@@ -840,7 +840,7 @@ docker exec -it mariadb_test bash
 - `mariadb_test` nom du conteneur
 - `bash` lance un shell bash à l'intérieur
 
-* une fois dans le shell du conteneur, se connecter :
+#### une fois dans le shell du conteneur, se connecter :
 
 ```bash
 mariadb -u root -p"$MDB_ROOT_PASS"
@@ -849,7 +849,7 @@ mariadb -u root -p"$MDB_ROOT_PASS"
 - `-u` spécifie l'utilisateur
 - `-p` permet d'entrer le mot de passe
 
-* une fois connecté au shell MariaDB, vérifier que la base de donnée `wordpress` existe :
+#### une fois connecté au shell MariaDB, vérifier que la base de donnée `wordpress` existe :
 
 ```mariadb
 SHOW DATABASES
